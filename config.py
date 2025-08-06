@@ -7,6 +7,9 @@ safe_mode = True
 # Set headless mode to True for headless operation (no GUI)
 headless = True
 
+# Set buffer time in seconds
+buffer = 1
+
 # Load passwords from .env file
 load_dotenv("./passwords.env")
 

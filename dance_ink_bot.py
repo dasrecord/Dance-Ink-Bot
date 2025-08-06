@@ -12,7 +12,7 @@ import datetime
 import email
 import re
 from email.utils import parsedate_to_datetime
-from config import studio_director_url, studio_director_username, studio_director_password, headless, safe_mode, email_username, email_password
+from config import studio_director_url, studio_director_username, studio_director_password, headless, safe_mode, buffer, email_username, email_password
 
 # Add debugging for email credentials
 print(f"Email username: {email_username}")
@@ -69,7 +69,7 @@ def login_to_studio_director():
         print("Clicked login button")
         
         print("Login submission attempted, waiting for response...")
-        time.sleep(2)  # Wait for page to load
+        time.sleep(buffer)  # Wait for page to load
         
         # Check if login was successful
         print(f"After login attempt - Current URL: {driver.current_url}")
@@ -228,7 +228,7 @@ def process_emails():
 
             # Navigate to main page and search for the sender
             driver.get("https://app.thestudiodirector.com/danceink/admin.sd")
-            time.sleep(1)
+            time.sleep(buffer)
 
             # Search for the sender
             search_field = None
@@ -284,7 +284,7 @@ def process_emails():
                 search_field.send_keys("\n")  # Try pressing Enter
                 print(f"Tried Enter key for search: {replyto_address}")
             
-            time.sleep(1)
+            time.sleep(buffer)
 
             # Click on the first search result in searchResultItem div
             try:
@@ -292,7 +292,7 @@ def process_emails():
                 first_result_link = search_result_div.find_element(By.TAG_NAME, "a")
                 first_result_link.click()
                 print("Clicked first search result from searchResultItem div")
-                time.sleep(1)
+                time.sleep(buffer)
             except Exception as search_result_error:
                 print(f"Could not find search result in searchResultItem div: {search_result_error}")
                 # Fallback to original method
@@ -302,7 +302,7 @@ def process_emails():
                     )
                     first_result.click()
                     print("Clicked first search result using fallback method")
-                    time.sleep(1)
+                    time.sleep(buffer)
                 except:
                     print("Could not find search result with any method, skipping this email")
                     continue
@@ -312,7 +312,7 @@ def process_emails():
                 ledger_tab = driver.find_element(By.ID, "tab-ledger")
                 ledger_tab.click()
                 print("Clicked Ledger tab")
-                time.sleep(1)
+                time.sleep(buffer)
                 
                 # Read the ledger table to determine what category this payment should be
                 payment_category = "Tuition"  # Default
@@ -358,7 +358,7 @@ def process_emails():
                 add_payment_button = driver.find_element(By.ID, "addnewpayment")
                 add_payment_button.click()
                 print("Clicked Add New Payment button")
-                time.sleep(1)
+                time.sleep(buffer)
             except Exception as add_payment_error:
                 print(f"Could not find Add New Payment button: {add_payment_error}")
                 print("Skipping this email")
@@ -369,7 +369,7 @@ def process_emails():
                 cash_check_trade_link = driver.find_element(By.XPATH, "//a[contains(text(), 'Cash, check, trade')]")
                 cash_check_trade_link.click()
                 print("Clicked 'Cash, check, trade' link")
-                time.sleep(1)
+                time.sleep(buffer)
             except Exception as cash_link_error:
                 print(f"Could not find 'Cash, check, trade' link: {cash_link_error}")
                 # Try alternative selectors
@@ -377,7 +377,7 @@ def process_emails():
                     cash_link_alt = driver.find_element(By.XPATH, "//a[contains(text(), 'Cash')]")
                     cash_link_alt.click()
                     print("Clicked cash link (alternative)")
-                    time.sleep(1)
+                    time.sleep(buffer)
                 except:
                     print("Could not find any cash/check/trade link, skipping this email")
                     continue
@@ -489,7 +489,7 @@ def process_emails():
                 split_payment_button = driver.find_element(By.ID, 'splitpayment')
                 split_payment_button.click()
                 print("Clicked Split Payment button")
-                time.sleep(1)
+                time.sleep(buffer)
                 
                 # Set the split payment category in the SELECT dropdown
                 try:
@@ -557,7 +557,7 @@ def process_emails():
                 if not safe_mode:
                     save_button.click()
                     print("Successfully clicked save button")
-                    time.sleep(2)  # Wait for save to complete
+                    time.sleep(buffer)  # Wait for save to complete
                 else:
                     print("SAFE MODE: Skipping save button click")
             except Exception as save_error:
@@ -590,7 +590,7 @@ def process_emails():
                         if not safe_mode:
                             save_button.click()
                             print("Successfully clicked save button (fallback)")
-                            time.sleep(2)  # Wait for save to complete
+                            time.sleep(buffer)  # Wait for save to complete
                         else:
                             print("SAFE MODE: Skipping save button click (fallback)")
                     except Exception as e:
@@ -603,7 +603,7 @@ def process_emails():
             # After saving payment, look for "Review the account ledger" link and click it
             try:
                 # Wait a moment for the page to update after saving
-                time.sleep(2)
+                time.sleep(buffer)
                 
                 # Look for the "Review the account ledger" link in the specific location:
                 # <a> tag inside the last <p> tag inside the div with class="contentInfo"
@@ -644,9 +644,9 @@ def process_emails():
                 if review_ledger_link:
                     review_ledger_link.click()
                     print("Clicked 'Review the account ledger' link")
-                    time.sleep(2)  # Wait for the ledger page to load
+                    time.sleep(buffer)  # Wait for the ledger page to load
                 # Wait a moment for the page to update after saving
-                time.sleep(2)
+                time.sleep(buffer)
                 
                 # Look for the "Review the account ledger" link
                 review_ledger_link = None
@@ -668,7 +668,7 @@ def process_emails():
                 if review_ledger_link:
                     review_ledger_link.click()
                     print("Clicked 'Review the account ledger' link")
-                    time.sleep(2)  # Wait for the ledger page to load
+                    time.sleep(buffer)  # Wait for the ledger page to load
                     
                     # Now check the current balance on this page
                     try:
