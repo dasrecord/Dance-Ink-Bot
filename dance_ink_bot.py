@@ -110,9 +110,10 @@ def fetch_emails():
         mail.login(email_username, email_password)
         mail.select('inbox')
 
-        # Search for today's emails
-        today = datetime.date.today().strftime("%d-%b-%Y")
-        result, data = mail.search(None, f'(SENTSINCE {today})')
+        # Get emails from the last n days
+        n = 1
+        start_date = (datetime.date.today() - datetime.timedelta(days=n)).strftime("%d-%b-%Y")
+        result, data = mail.search(None, f'(SENTSINCE {start_date})')
         
         email_ids = data[0].split() if data[0] else []
         print(f"Fetched {len(email_ids)} emails from today.")
@@ -122,9 +123,15 @@ def fetch_emails():
             result, msg_data = mail.fetch(email_id, '(RFC822)')
             msg = email.message_from_bytes(msg_data[0][1])
             
+            subject = msg["Subject"] or ""
+            print(f"Found email with subject: '{subject}'")
+            
             # Only process e-transfer emails
             if msg["Subject"] and "e-Transfer" in msg["Subject"]:
+                print(f"✅ This is an e-transfer email: {subject}")
                 emails.append(msg)
+            else:
+                print(f"❌ Skipping non-e-transfer email: {subject}")
 
         mail.logout()
         return emails
@@ -137,6 +144,11 @@ def process_emails():
     global driver
     
     emails = fetch_emails()
+    print(f"Found {len(emails)} e-transfer emails to process")
+    
+    if len(emails) == 0:
+        print("No e-transfer emails found to process")
+        return
     
     # Keep track of processed reference numbers to avoid duplicates
     processed_references = set()
@@ -483,10 +495,9 @@ def process_emails():
                 try:
                     paid_toward_select = Select(driver.find_element(By.NAME, 'paid_toward1'))
                     
-                    # First, let's see what options are available
+                    # Get available options for selection logic
                     all_options = paid_toward_select.options
                     available_options = [(opt.get_attribute('value'), opt.text) for opt in all_options]
-                    print(f"Available paid_toward1 options: {available_options}")
                     
                     # Try different selection methods based on the split_category
                     selection_successful = False
@@ -585,6 +596,49 @@ def process_emails():
 
             # After saving payment, look for "Review the account ledger" link and click it
             try:
+                # Wait a moment for the page to update after saving
+                time.sleep(2)
+                
+                # Look for the "Review the account ledger" link in the specific location:
+                # <a> tag inside the last <p> tag inside the div with class="contentInfo"
+                review_ledger_link = None
+                
+                try:
+                    # Find the contentInfo div, then get the last p tag, then find the a tag inside it
+                    content_info_div = driver.find_element(By.CLASS_NAME, "contentInfo")
+                    p_tags = content_info_div.find_elements(By.TAG_NAME, "p")
+                    
+                    if p_tags:
+                        last_p_tag = p_tags[-1]  # Get the last p tag
+                        review_ledger_link = last_p_tag.find_element(By.TAG_NAME, "a")
+                        print("Found 'Review the account ledger' link in last <p> tag of contentInfo div")
+                    else:
+                        print("No <p> tags found in contentInfo div")
+                        
+                except Exception as specific_error:
+                    print(f"Could not find link in contentInfo div: {specific_error}")
+                    
+                    # Fallback to original selectors if the specific location fails
+                    review_selectors = [
+                        (By.XPATH, "//div[@class='contentInfo']//p[last()]//a"),
+                        (By.XPATH, "//a[contains(text(), 'Review the account ledger')]"),
+                        (By.XPATH, "//a[contains(text(), 'Review')]"),
+                        (By.XPATH, "//a[contains(text(), 'ledger')]"),
+                        (By.XPATH, "//a[contains(text(), 'account ledger')]")
+                    ]
+                    
+                    for selector_type, selector_value in review_selectors:
+                        try:
+                            review_ledger_link = driver.find_element(selector_type, selector_value)
+                            print(f"Found 'Review the account ledger' link using fallback: {selector_type}='{selector_value}'")
+                            break
+                        except:
+                            continue
+                
+                if review_ledger_link:
+                    review_ledger_link.click()
+                    print("Clicked 'Review the account ledger' link")
+                    time.sleep(2)  # Wait for the ledger page to load
                 # Wait a moment for the page to update after saving
                 time.sleep(2)
                 
