@@ -1,0 +1,37 @@
+=== Dance Ink Bot Cron Job Started at Tue Aug  5 21:53:00 CST 2025 ===
+/Users/PD/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Email username: Danceinkpayments@gmail.com
+Email password configured: Yes
+Password length: 19 characters
+Password ends with: ...zvjz
+Safe mode: True
+=== Dance Ink Bot Starting ===
+Logging in to Studio Director...
+Navigated to: https://app.thestudiodirector.com/danceink/login.sd
+Looking for username field...
+Username entered
+Looking for password field...
+Password entered
+Attempting to submit login...
+Found login button with selector: /html/body/div/div/div[1]/div/form/div[5]/a
+Clicked login button
+Login submission attempted, waiting for response...
+After login attempt - Current URL: https://app.thestudiodirector.com/danceink/admin.sd
+After login attempt - Page title: The Studio Director
+✅ Login successful - Reached admin page
+
+=== Processing Emails ===
+Fetched 3 emails from today.
+Found email with subject: 'Your City of Saskatoon eBill is ready for viewing'
+❌ Skipping non-e-transfer email: Your City of Saskatoon eBill is ready for viewing
+Found email with subject: 'Your City of Saskatoon eBill is ready for viewing'
+❌ Skipping non-e-transfer email: Your City of Saskatoon eBill is ready for viewing
+Found email with subject: 'Your City of Saskatoon eBill is ready for viewing'
+❌ Skipping non-e-transfer email: Your City of Saskatoon eBill is ready for viewing
+Found 0 e-transfer emails to process
+No e-transfer emails found to process
+=== Dance Ink Bot Finished Successfully ===
+Browser closed.
+=== Dance Ink Bot Cron Job Completed at Tue Aug  5 21:53:07 CST 2025 ===
+

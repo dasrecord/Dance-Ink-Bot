@@ -554,9 +554,12 @@ def process_emails():
             try:
                 save_button = driver.find_element(By.ID, "savepayment")
                 print("Found save button with ID: savepayment")
-                save_button.click()
-                print("Successfully clicked save button")
-                time.sleep(2)  # Wait for save to complete
+                if not safe_mode:
+                    save_button.click()
+                    print("Successfully clicked save button")
+                    time.sleep(2)  # Wait for save to complete
+                else:
+                    print("SAFE MODE: Skipping save button click")
             except Exception as save_error:
                 print(f"Could not find save button with ID 'savepayment': {save_error}")
                 # Fallback to other selectors
@@ -584,9 +587,12 @@ def process_emails():
                 
                 if save_button:
                     try:
-                        save_button.click()
-                        print("Successfully clicked save button (fallback)")
-                        time.sleep(2)  # Wait for save to complete
+                        if not safe_mode:
+                            save_button.click()
+                            print("Successfully clicked save button (fallback)")
+                            time.sleep(2)  # Wait for save to complete
+                        else:
+                            print("SAFE MODE: Skipping save button click (fallback)")
                     except Exception as e:
                         print(f"Error clicking save button: {e}")
                 else:

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 safe_mode = True
 
 # Set headless mode to True for headless operation (no GUI)
-headless = False
+headless = True
 
 # Load passwords from .env file
 load_dotenv("./passwords.env")
