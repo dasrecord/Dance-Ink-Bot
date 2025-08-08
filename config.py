@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 
 # Set safe mode to True to prevent any actions that could cause damage
-safe_mode = True
+safe_mode = False
 
 # Set headless mode to True for headless operation (no GUI)
 headless = True

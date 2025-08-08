@@ -24,6 +24,7 @@ print(f"Safe mode: {safe_mode}")
 
 # Initialize WebDriver as a global variable
 driver = None
+mail = None  # Add global mail variable
 
 def login_to_studio_director():
     global driver
@@ -104,6 +105,7 @@ def login_to_studio_director():
         return False
 
 def fetch_emails():
+    global mail  # Make mail global so we can use it later
     try:
         # Connect to the email server
         mail = imaplib.IMAP4_SSL('imap.gmail.com')
@@ -129,16 +131,63 @@ def fetch_emails():
             # Only process e-transfer emails
             if msg["Subject"] and "e-Transfer" in msg["Subject"]:
                 print(f"✅ This is an e-transfer email: {subject}")
-                emails.append(msg)
+                emails.append((msg, email_id))  # Store both message and ID
             else:
                 print(f"❌ Skipping non-e-transfer email: {subject}")
 
-        mail.logout()
+        # Don't logout here - we need the connection for later
         return emails
         
     except Exception as e:
         print(f"Error fetching emails: {e}")
         return []
+
+def mark_email_processed(email_id, reference_number):
+    """Mark email as read and apply '2025 Payments EFT's' label"""
+    global mail
+    try:
+        # Mark email as read
+        mail.store(email_id, '+FLAGS', '\\Seen')
+        print(f"✅ Marked email {email_id} as read")
+        
+        # Create/apply the Gmail label
+        label_name = "2025 Payments EFT's"
+        
+        # First, try to create the label (in case it doesn't exist)
+        try:
+            mail.create(label_name)
+            print(f"Created Gmail label: {label_name}")
+        except:
+            # Label already exists, which is fine
+            pass
+        
+        # Apply the label to the email
+        try:
+            mail.store(email_id, '+X-GM-LABELS', label_name)
+            print(f"✅ Applied label '{label_name}' to email {email_id}")
+        except Exception as label_error:
+            print(f"⚠️ Could not apply label: {label_error}")
+            # Try alternative Gmail labeling method
+            try:
+                mail.copy(email_id, label_name)
+                print(f"✅ Applied label '{label_name}' using copy method")
+            except Exception as copy_error:
+                print(f"❌ Failed to apply label with any method: {copy_error}")
+        
+        print(f"Email processing completed for reference {reference_number}")
+        
+    except Exception as e:
+        print(f"❌ Error marking email as processed: {e}")
+
+def cleanup_email_connection():
+    """Close the email connection"""
+    global mail
+    try:
+        if mail:
+            mail.logout()
+            print("Email connection closed")
+    except:
+        pass
 
 def process_emails():
     global driver
@@ -153,7 +202,7 @@ def process_emails():
     # Keep track of processed reference numbers to avoid duplicates
     processed_references = set()
     
-    for msg in emails:
+    for msg, email_id in emails:  # Unpack message and email ID
         try:
             # Extract payment details
             payment_date = parsedate_to_datetime(msg["Date"])
@@ -703,6 +752,10 @@ def process_emails():
                             # Check if balance is zero (could be $0.00, 0.00, or similar)
                             if "0.00" in current_balance or current_balance == "0" or current_balance == "$0":
                                 print("✅ Balance is correctly zeroed out - payment successful")
+                                
+                                # Mark email as processed since payment was successful
+                                mark_email_processed(email_id, reference_number)
+                                
                             else:
                                 print(f"⚠️ Balance is NOT zero: {current_balance} - moving to next e-transfer")
                                 continue  # Skip to next email
@@ -754,3 +807,6 @@ if __name__ == "__main__":
             print("Browser closed.")
         except:
             pass
+        
+        # Close email connection
+        cleanup_email_connection()
