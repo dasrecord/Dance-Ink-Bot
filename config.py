@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 safe_mode = False
 
 # Set headless mode to True for headless operation (no GUI)
-headless = True
+headless = False
 
 # Set buffer time in seconds
 buffer = 1

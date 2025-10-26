@@ -112,13 +112,16 @@ def fetch_emails():
         mail.login(email_username, email_password)
         mail.select('inbox')
 
-        # Get emails from the last n days
-        n = 1
+        # Get emails from the last n days - ONLY UNREAD emails
+        n = 30  # Changed from 1 to 30 days to capture all October e-transfers
         start_date = (datetime.date.today() - datetime.timedelta(days=n)).strftime("%d-%b-%Y")
-        result, data = mail.search(None, f'(SENTSINCE {start_date})')
+        
+        # Search for UNREAD emails only from the specified date range
+        search_criteria = f'(SENTSINCE {start_date} UNSEEN)'
+        result, data = mail.search(None, search_criteria)
         
         email_ids = data[0].split() if data[0] else []
-        print(f"Fetched {len(email_ids)} emails from today.")
+        print(f"Fetched {len(email_ids)} UNREAD emails from the last {n} days.")
 
         emails = []
         for email_id in email_ids:
@@ -188,6 +191,159 @@ def cleanup_email_connection():
             print("Email connection closed")
     except:
         pass
+
+def verify_family_email_match(target_email):
+    """Verify if current family page has matching email in email or extra_emails fields within Overview tab"""
+    try:
+        # We should be on the Overview tab by default when clicking a family
+        # Look for email fields within the overview tab content
+        print("Looking for email fields in Overview tab...")
+        
+        primary_email = ""
+        extra_emails = ""
+        
+        # Look for the email field inside a td element with id="email"
+        try:
+            email_field = driver.find_element(By.XPATH, "//td//input[@id='email']")
+            primary_email = email_field.get_attribute("value")
+            if primary_email is None:
+                primary_email = email_field.text.strip()
+            if primary_email is None:
+                primary_email = ""
+            primary_email = primary_email.strip().lower()
+            print(f"Found primary email field: '{primary_email}'")
+        except Exception as email_error:
+            print(f"Could not find primary email field: {email_error}")
+            # Try alternative selector
+            try:
+                email_field = driver.find_element(By.ID, "email")
+                primary_email = email_field.get_attribute("value") or email_field.text or ""
+                primary_email = primary_email.strip().lower()
+                print(f"Found primary email field (alternative): '{primary_email}'")
+            except:
+                print("Could not find primary email field with any method")
+        
+        # Check if primary email matches
+        if primary_email and primary_email == target_email.lower():
+            print(f"✅ Primary email matches target: {target_email}")
+            return True
+        
+        # Look for the extra_emails field inside a td element with id="extra_emails"
+        try:
+            extra_emails_field = driver.find_element(By.XPATH, "//td//input[@id='extra_emails']")
+            extra_emails = extra_emails_field.get_attribute("value")
+            if extra_emails is None:
+                extra_emails = extra_emails_field.text.strip()
+            if extra_emails is None:
+                extra_emails = ""
+            extra_emails = extra_emails.strip().lower()
+            print(f"Found extra emails field: '{extra_emails}'")
+        except Exception as extra_error:
+            print(f"Could not find extra emails field: {extra_error}")
+            # Try alternative selector
+            try:
+                extra_emails_field = driver.find_element(By.ID, "extra_emails")
+                extra_emails = extra_emails_field.get_attribute("value") or extra_emails_field.text or ""
+                extra_emails = extra_emails.strip().lower()
+                print(f"Found extra emails field (alternative): '{extra_emails}'")
+            except:
+                print("Could not find extra emails field with any method")
+        
+        # Check if target email is in the extra emails (could be comma-separated)
+        if extra_emails and target_email.lower() in extra_emails:
+            print(f"✅ Target email found in extra emails: {target_email}")
+            return True
+        
+        print(f"❌ Email mismatch - target: {target_email}, primary: '{primary_email}', extra: '{extra_emails}'")
+        return False
+        
+    except Exception as e:
+        print(f"Error verifying family email: {e}")
+        return False
+
+def find_correct_family_result(target_email):
+    """Find and click the correct family result by verifying email fields"""
+    try:
+        # First try searchResultItem divs
+        search_result_divs = driver.find_elements(By.CLASS_NAME, "searchResultItem")
+        if search_result_divs:
+            print(f"Found {len(search_result_divs)} search results to check")
+            
+            for i, result_div in enumerate(search_result_divs):
+                try:
+                    result_link = result_div.find_element(By.TAG_NAME, "a")
+                    result_text = result_link.text.strip()
+                    print(f"Checking result {i+1}: '{result_text}'")
+                    
+                    # Click the result
+                    result_link.click()
+                    time.sleep(buffer)
+                    
+                    # Check if this family has the correct email
+                    if verify_family_email_match(target_email):
+                        print(f"✅ Found correct family: '{result_text}'")
+                        
+                        # Since we found the correct family and we're on Overview tab,
+                        # we can now directly access the Ledger tab (they're at same level)
+                        print("Email verified, ready to proceed to Ledger tab")
+                        
+                        return True
+                    else:
+                        print(f"❌ Wrong family: '{result_text}', going back to search results")
+                        # Go back to search results
+                        driver.back()
+                        time.sleep(buffer)
+                        
+                except Exception as result_error:
+                    print(f"Error checking result {i+1}: {result_error}")
+                    continue
+        
+        # Fallback to table method if searchResultItem didn't work
+        print("Trying fallback table method...")
+        try:
+            accounts_table = driver.find_element(By.ID, "accountsTable")
+            result_rows = accounts_table.find_elements(By.XPATH, ".//tr[position()>1]")  # Skip header
+            
+            print(f"Found {len(result_rows)} table results to check")
+            
+            for i, row in enumerate(result_rows):
+                try:
+                    result_link = row.find_element(By.TAG_NAME, "a")
+                    result_text = result_link.text.strip()
+                    print(f"Checking table result {i+1}: '{result_text}'")
+                    
+                    # Click the result
+                    result_link.click()
+                    time.sleep(buffer)
+                    
+                    # Check if this family has the correct email
+                    if verify_family_email_match(target_email):
+                        print(f"✅ Found correct family in table: '{result_text}'")
+                        
+                        # Since we found the correct family and we're on Overview tab,
+                        # we can now directly access the Ledger tab (they're at same level)
+                        print("Email verified, ready to proceed to Ledger tab")
+                        
+                        return True
+                    else:
+                        print(f"❌ Wrong family in table: '{result_text}', going back to search results")
+                        # Go back to search results
+                        driver.back()
+                        time.sleep(buffer)
+                        
+                except Exception as table_result_error:
+                    print(f"Error checking table result {i+1}: {table_result_error}")
+                    continue
+        
+        except Exception as table_error:
+            print(f"Error with table fallback method: {table_error}")
+        
+        print("❌ Could not find family with matching email")
+        return False
+        
+    except Exception as e:
+        print(f"Error in find_correct_family_result: {e}")
+        return False
 
 def process_emails():
     global driver
@@ -273,7 +429,18 @@ def process_emails():
             else:
                 sender_name = "Unknown"
 
+            # Extract message field from the e-transfer email
+            message_match = re.search(r'Message: (.+)', message_body)
+            if message_match:
+                etransfer_message = message_match.group(1).strip()
+                print(f"Found e-transfer message: '{etransfer_message}'")
+            else:
+                etransfer_message = ""
+                print("No message found in e-transfer email")
+
             print(f"Processing e-transfer: ${amount} from {sender_name} <{replyto_address}>")
+            if etransfer_message:
+                print(f"E-transfer message: '{etransfer_message}'")
 
             # Navigate to main page and search for the sender
             driver.get("https://app.thestudiodirector.com/danceink/admin.sd")
@@ -335,30 +502,153 @@ def process_emails():
             
             time.sleep(buffer)
 
-            # Click on the first search result in searchResultItem div
+            # Try to find search results - check if email search was successful
+            search_successful = False
             try:
-                search_result_div = driver.find_element(By.CLASS_NAME, "searchResultItem")
-                first_result_link = search_result_div.find_element(By.TAG_NAME, "a")
-                first_result_link.click()
-                print("Clicked first search result from searchResultItem div")
-                time.sleep(buffer)
+                # Use the new function to find correct family by email verification
+                if find_correct_family_result(replyto_address):
+                    print("✅ Found and verified correct family from email search")
+                    search_successful = True
+                else:
+                    print("❌ Could not find family with matching email address")
+                    search_successful = False
             except Exception as search_result_error:
-                print(f"Could not find search result in searchResultItem div: {search_result_error}")
-                # Fallback to original method
-                try:
-                    first_result = WebDriverWait(driver, 5).until(
-                        EC.element_to_be_clickable((By.XPATH, "//table[@id='accountsTable']//tr[2]//a"))
-                    )
-                    first_result.click()
-                    print("Clicked first search result using fallback method")
-                    time.sleep(buffer)
-                except:
-                    print("Could not find search result with any method, skipping this email")
-                    continue
+                print(f"Error during email search result verification: {search_result_error}")
+                search_successful = False
 
-            # Click the Ledger tab to view account details
+            # If email search failed and we have a message, try searching with the message
+            if not search_successful and etransfer_message:
+                print(f"Email search failed, trying to search with e-transfer message: '{etransfer_message}'")
+                
+                # Navigate back to main page for new search
+                driver.get("https://app.thestudiodirector.com/danceink/admin.sd")
+                time.sleep(buffer)
+                
+                # Find search field again
+                search_field = None
+                for selector_type, selector_value in search_selectors:
+                    try:
+                        search_field = driver.find_element(selector_type, selector_value)
+                        print(f"Found search field for message search using: {selector_type}='{selector_value}'")
+                        break
+                    except:
+                        continue
+                
+                if search_field:
+                    search_field.clear()
+                    search_field.send_keys(etransfer_message)
+                    
+                    # Click search button for message search
+                    search_button = None
+                    for selector_type, selector_value in search_button_selectors:
+                        try:
+                            search_button = driver.find_element(selector_type, selector_value)
+                            break
+                        except:
+                            continue
+                    
+                    if search_button:
+                        search_button.click()
+                        print(f"Successfully searched for message: {etransfer_message}")
+                    else:
+                        search_field.send_keys("\n")
+                        print(f"Tried Enter key for message search: {etransfer_message}")
+                    
+                    time.sleep(buffer)
+                    
+                    # Try to find results from message search
+                    try:
+                        search_result_div = driver.find_element(By.CLASS_NAME, "searchResultItem")
+                        first_result_link = search_result_div.find_element(By.TAG_NAME, "a")
+                        first_result_link.click()
+                        print("Clicked first search result from message search (searchResultItem div)")
+                        search_successful = True
+                        time.sleep(buffer)
+                    except Exception as message_search_error:
+                        print(f"Could not find search result with message search: {message_search_error}")
+                        try:
+                            first_result = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, "//table[@id='accountsTable']//tr[2]//a"))
+                            )
+                            first_result.click()
+                            print("Clicked first search result from message search (fallback method)")
+                            search_successful = True
+                            time.sleep(buffer)
+                        except:
+                            print("Message search also failed to find results")
+                            search_successful = False
+
+            # If email and message searches failed, try sender name as third fallback
+            if not search_successful and sender_name and sender_name != "Unknown":
+                print(f"Email and message searches failed, trying to search with sender name: '{sender_name}'")
+                
+                # Navigate back to main page for sender name search
+                driver.get("https://app.thestudiodirector.com/danceink/admin.sd")
+                time.sleep(buffer)
+                
+                # Find search field again
+                search_field = None
+                for selector_type, selector_value in search_selectors:
+                    try:
+                        search_field = driver.find_element(selector_type, selector_value)
+                        print(f"Found search field for sender name search using: {selector_type}='{selector_value}'")
+                        break
+                    except:
+                        continue
+                
+                if search_field:
+                    search_field.clear()
+                    search_field.send_keys(sender_name)
+                    
+                    # Click search button for sender name search
+                    search_button = None
+                    for selector_type, selector_value in search_button_selectors:
+                        try:
+                            search_button = driver.find_element(selector_type, selector_value)
+                            break
+                        except:
+                            continue
+                    
+                    if search_button:
+                        search_button.click()
+                        print(f"Successfully searched for sender name: {sender_name}")
+                    else:
+                        search_field.send_keys("\n")
+                        print(f"Tried Enter key for sender name search: {sender_name}")
+                    
+                    time.sleep(buffer)
+                    
+                    # Try to find results from sender name search
+                    try:
+                        search_result_div = driver.find_element(By.CLASS_NAME, "searchResultItem")
+                        first_result_link = search_result_div.find_element(By.TAG_NAME, "a")
+                        first_result_link.click()
+                        print("Clicked first search result from sender name search (searchResultItem div)")
+                        search_successful = True
+                        time.sleep(buffer)
+                    except Exception as sender_search_error:
+                        print(f"Could not find search result with sender name search: {sender_search_error}")
+                        try:
+                            first_result = WebDriverWait(driver, 5).until(
+                                EC.element_to_be_clickable((By.XPATH, "//table[@id='accountsTable']//tr[2]//a"))
+                            )
+                            first_result.click()
+                            print("Clicked first search result from sender name search (fallback method)")
+                            search_successful = True
+                            time.sleep(buffer)
+                        except:
+                            print("Sender name search also failed to find results")
+                            search_successful = False
+
+            # If all three searches failed, skip this email
+            if not search_successful:
+                print("All searches failed (email, message, and sender name), skipping this email")
+                continue
+
+            # Check if we landed on a student page (no ledger tab) or family account page
             try:
                 ledger_tab = driver.find_element(By.ID, "tab-ledger")
+                # We have a ledger tab, so we're on a family account page
                 ledger_tab.click()
                 print("Clicked Ledger tab")
                 time.sleep(buffer)
@@ -399,8 +689,106 @@ def process_emails():
                     
             except Exception as ledger_error:
                 print(f"Could not find Ledger tab: {ledger_error}")
-                payment_category = "Tuition"  # Default fallback
-                print("Using default Tuition category")
+                print("Looks like we're on a student page, trying to navigate to family account...")
+                
+                # Try to click the Family tab to get family information
+                try:
+                    family_tab = driver.find_element(By.ID, "tab-family")
+                    family_tab.click()
+                    print("Clicked Family tab")
+                    time.sleep(buffer)
+                    
+                    # Look for Family Summary table and extract email
+                    try:
+                        family_summary_table = driver.find_element(By.XPATH, "//table[contains(@class, 'Family Summary') or contains(text(), 'Family Summary')]")
+                        family_rows = family_summary_table.find_elements(By.TAG_NAME, 'tr')
+                        
+                        family_email = None
+                        for row in family_rows:
+                            cells = row.find_elements(By.TAG_NAME, 'td')
+                            if len(cells) >= 2:
+                                # Check if second cell contains an email (has @ symbol)
+                                potential_email = cells[1].text.strip()
+                                if '@' in potential_email:
+                                    family_email = potential_email
+                                    print(f"Found family email: {family_email}")
+                                    break
+                        
+                        if family_email:
+                            print(f"Searching for family account using email: {family_email}")
+                            
+                            # Navigate back to main page for family search
+                            driver.get("https://app.thestudiodirector.com/danceink/admin.sd")
+                            time.sleep(buffer)
+                            
+                            # Search for family using the extracted email
+                            search_field = None
+                            for selector_type, selector_value in search_selectors:
+                                try:
+                                    search_field = driver.find_element(selector_type, selector_value)
+                                    break
+                                except:
+                                    continue
+                            
+                            if search_field:
+                                search_field.clear()
+                                search_field.send_keys(family_email)
+                                
+                                # Click search button
+                                search_button = None
+                                for selector_type, selector_value in search_button_selectors:
+                                    try:
+                                        search_button = driver.find_element(selector_type, selector_value)
+                                        break
+                                    except:
+                                        continue
+                                
+                                if search_button:
+                                    search_button.click()
+                                    print(f"Successfully searched for family email: {family_email}")
+                                else:
+                                    search_field.send_keys("\n")
+                                    print(f"Tried Enter key for family email search: {family_email}")
+                                
+                                time.sleep(buffer)
+                                
+                                # Try to find and click family account result with email verification
+                                try:
+                                    if find_correct_family_result(family_email):
+                                        print("✅ Found and verified correct family from family email search")
+                                        
+                                        # Now try to click the Ledger tab on the family account
+                                        ledger_tab = driver.find_element(By.ID, "tab-ledger")
+                                        ledger_tab.click()
+                                        print("Clicked Ledger tab on family account")
+                                        time.sleep(buffer)
+                                        
+                                        # Set payment category to default since we're now on family account
+                                        payment_category = "Tuition"
+                                        print("Set payment category to Tuition (family account)")
+                                    else:
+                                        print("❌ Could not find family with matching family email")
+                                        payment_category = "Tuition"
+                                    
+                                except Exception as family_search_error:
+                                    print(f"Could not find/click family account: {family_search_error}")
+                                    print("Using default Tuition category and continuing...")
+                                    payment_category = "Tuition"
+                            else:
+                                print("Could not find search field for family email search")
+                                payment_category = "Tuition"
+                        else:
+                            print("Could not find family email in Family Summary table")
+                            payment_category = "Tuition"
+                            
+                    except Exception as family_table_error:
+                        print(f"Could not find or read Family Summary table: {family_table_error}")
+                        payment_category = "Tuition"
+                        
+                except Exception as family_tab_error:
+                    print(f"Could not find Family tab: {family_tab_error}")
+                    payment_category = "Tuition"  # Default fallback
+                    print("Using default Tuition category")
 
             # Click the Add New Payment button
             try:
